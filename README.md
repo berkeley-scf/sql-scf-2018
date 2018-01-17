@@ -17,10 +17,10 @@ If you'd like to be able to replicate the demo I do of creating a PostgreSQL dat
 
 ## Tentative schedule
 
-9 am - 10 am: (optional) review/introduction to databases and SQL
-10 am - noon: more advanced SQL
-noon - 1 pm: break for lunch (on your own)
-1 pm - 3 pm: database administration and additional SQL topics
+- 9 am - 10 am: (optional) review/introduction to databases and SQL
+- 10 am - noon: more advanced SQL
+- noon - 1 pm: break for lunch (on your own)
+- 1 pm - 3 pm: database administration and additional SQL topics
 
 ## Location 
 
