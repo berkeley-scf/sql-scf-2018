@@ -24,4 +24,4 @@ If you'd like to be able to replicate the demo I do of creating a PostgreSQL dat
 
 ## Location 
 
-Evans 342. If you don't have keycard access to the building and the door is locked, please call Chris (see phone number in email) and go to the Evans door by Hearst Mining Circle.
+Evans 342. If you don't have keycard access to the building and the door is locked, please text Chris (see phone number in email) and go to the Evans door by Hearst Mining Circle.
