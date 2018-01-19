@@ -316,12 +316,11 @@ So we need to join two copies of the same table, which means dealing with resolv
 
 This would look like this:
 ```{r, eval=FALSE}
-dbGetQuery(db, "create view question_contrasts as
-               select * from questions Q1 join questions Q2
+dbGetQuery(db, "select * from questions Q1 join questions Q2
                on Q1.ownerid = Q2.ownerid")
 ```
 
-That should create a new table (actually a view -- a kind of virtual table) with all pairs of questions asked by a single person.
+That should return a table with all pairs of questions asked by a single person.
 
 Actually, there's a problem here.
 
@@ -332,8 +331,7 @@ Actually, there's a problem here.
 A solution to that problem of having the same question paired with itself is:
 
 ```{r, eval=FALSE}
-dbGetQuery(db, "create view question_contrasts as
-               select * from questions Q1 join questions Q2
+dbGetQuery(db, "select * from questions Q1 join questions Q2
                on Q1.ownerid = Q2.ownerid
                where Q1.creationdate != Q2.creationdate")
 ```
@@ -342,9 +340,9 @@ dbGetQuery(db, "create view question_contrasts as
 
 # Breakout questions
 
-- Create a view with one row for every question-tag pair. Check you get the same result with an explicit inner join and an implicit inner join.
+- Run a query that produces one row for every question-tag pair. Check you get the same result with an explicit inner join and an implicit inner join.
 
-- Create a view with one row for every question-tag pair, including questions without any tags. How many have no tags?
+- Run a query that produces one row for every question-tag pair, including questions without any tags. How many have no tags?
 The NULL keyword will come in handy -- it's like `NA` in R.
 
 - How many questions are tagged with both 'R' and 'python'? Be careful - it's easy to overcount here.
@@ -568,7 +566,7 @@ In this case we'll be explicit about where on the disk filesystem the database i
 
 ```
 show data_directory;
-create tablespace dbspace location '/tmp/pg';
+create tablespace dbspace location '/var/tmp/pg';
 create database wikistats tablespace dbspace;
 create user paciorek with password 'test';
 grant all privileges on database wikistats to paciorek;
@@ -694,7 +692,7 @@ Here we see that even after putting an index, this string-based query is still d
 dbGetQuery(db, "explain select * from questions where creationdate like '2016-05-11%'")
 system.time(result <- dbGetQuery(db, "select * from questions
                    where creationdate like '2016-05-11%'"))  # 2.6 sec.
-dbGetQuery(db, "create index date_index on questions(creationdate)")
+dbGetQuery(db, "create index date_index on questions(creationdate)") # takes a long time
 dbGetQuery(db, "explain select * from questions where creationdate like '2016-05-11%'")
 system.time(result <- dbGetQuery(db, "select * from questions
                    where creationdate like '2016-05-11%'"))  # 2.6 sec. (still a sequential scan)

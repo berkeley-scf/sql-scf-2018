@@ -623,7 +623,7 @@ select * from table1 join table2 using(id)</code></pre>
 </div>
 <div id="sqlite-basics" class="slide section level1">
 <h1>SQLite basics</h1>
-<p>You can create a new SQLite database and new tables from with R or Python by simply opening a non-existing database and then creating tables from data structures in R or Python (e.g., by using <code>dbWriteTable</code> in R.</p>
+<p>You can create a new SQLite database and new tables from with R or Python by simply opening a non-existing database and then creating tables from data structures in R or Python (e.g., by using <code>dbWriteTable()</code> in R).</p>
 <p>However, you can also administer an SQLite database from the SQLite command line.</p>
 <p>To start the SQLite interpreter in Linux, either operating on or creating a database named <code>wikistats.db</code>:</p>
 <pre><code>sqlite3 wikistats.db</code></pre>
@@ -655,7 +655,10 @@ done</code></pre>
 </div>
 <div id="postgresql-background" class="slide section level1">
 <h1>PostgreSQL background</h1>
-<p>There are a variety of relational database management systems (DBMS). Other than SQLite, most databases (i.e., DBMS) use a client-server model, where the user connects to a database running on a server machine. Multiple users can often access the same database. We'll focus on PostgreSQL as an example of this kind of operation because is is a popular open-source DBMS that is a good representative of a client-server model and has some functionality that SQLite lacks.</p>
+<p>There are a variety of relational database management systems (DBMS).</p>
+<p>Other than SQLite, most databases (i.e., DBMS) use a client-server model, where the user connects to a database running on a server machine.</p>
+<p>Multiple users can often access the same database.</p>
+<p>We'll focus on PostgreSQL as an example of this kind of operation because is is a popular open-source DBMS that is a good representative of a client-server model and has some functionality that SQLite lacks.</p>
 </div>
 <div id="postgresql-setup" class="slide section level1">
 <h1>PostgreSQL setup</h1>
@@ -702,7 +705,8 @@ copy webtraffic from 'part-00000' csv;  # for CSV</code></pre>
 <h1>Reading data into PostgreSQL (2)</h1>
 <p>Here's an example of looping through multiple files and adding them to a table in the database.</p>
 <pre><code>export PGPASSWORD=test  # set password via UNIX environment variable
-for file in $(ls part*gz); do  # loop thru files whose names start with 'part' and end with 'gz'
+for file in $(ls part*gz); do
+  # loop thru files whose names start with 'part' and end with 'gz'
   echo &quot;copying $file&quot;
   ## unzip and then pass by UNIX pipe to psql run in non-interactive mode
   gzip -cd $file |
@@ -716,8 +720,8 @@ done</code></pre>
 <p>If you're accessing from another machine on a network (e.g., in the SCF), you can forward the port used by the database (5432) to an unused port on your local machine (let's say it's 63333) and then connect to that port.</p>
 <p>You can forward a port on Mac or Linux like this:</p>
 <pre><code>ssh -L 63333:localhost:5432 yourUserName@gandalf.berkeley.edu</code></pre>
-<p>For Windows, see (https://www.akadia.com/services/ssh_putty.html). Specifically, put 63333 as the 'Source port' and '127.0.0.1:5432' as the Destination.</p>
-<p>To connect to PostgreSQL in a Docker container:</p>
+<p>For Windows, see <a href="https://www.akadia.com/services/ssh_putty.html" class="uri">https://www.akadia.com/services/ssh_putty.html</a>. Specifically, put 63333 as the 'Source port' and '127.0.0.1:5432' as the Destination.</p>
+<p>To connect to PostgreSQL in a Docker container you'll also need to forward the port:</p>
 <pre><code>docker run -p 63333:5432 -ti rocker/r-base /bin/bash</code></pre>
 </div>
 <div id="remote-access-to-postgresql-connecting" class="slide section level1">
@@ -767,7 +771,7 @@ db &lt;-<span class="st"> </span><span class="kw">dbConnect</span>(drv, <span cl
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">system.time</span>(result &lt;-<span class="st"> </span><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;select * from questions</span>
 <span class="st">                   where creationdate like '2016-05-11%'&quot;</span>))  <span class="co"># 2.6 sec.</span></code></pre></div>
 <pre><code>##    user  system elapsed 
-##   0.039   0.001   2.519</code></pre>
+##   0.039   0.001   2.641</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;create index date_index on questions(creationdate)&quot;</span>)</code></pre></div>
 <pre><code>## NULL</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;explain select * from questions where creationdate like '2016-05-11%'&quot;</span>)</code></pre></div>
@@ -777,27 +781,31 @@ db &lt;-<span class="st"> </span><span class="kw">dbConnect</span>(drv, <span cl
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">system.time</span>(result &lt;-<span class="st"> </span><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;select * from questions</span>
 <span class="st">                   where creationdate like '2016-05-11%'&quot;</span>))  <span class="co"># 2.6 sec. (still a sequential scan)</span></code></pre></div>
 <pre><code>##    user  system elapsed 
-##   0.013   0.000   2.502</code></pre>
+##   0.013   0.000   2.553</code></pre>
 </div>
 <div id="sql-query-plans-and-explain-2" class="slide section level1">
 <h1>SQL query plans and EXPLAIN (2)</h1>
 <p>However, if we look for an exact value, then we see that the index is used when it's available.</p>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;explain select * from questions where creationdate = '2016-05-11 00:00:15'&quot;</span>)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;explain select * from questions where</span>
+<span class="st">               creationdate = '2016-05-11 00:00:15'&quot;</span>)</code></pre></div>
 <pre><code>##                                                                    QUERY PLAN
 ## 1 Index Scan using date_index on questions  (cost=0.56..8.58 rows=1 width=40)
 ## 2                    Index Cond: (creationdate = '2016-05-11 00:00:15'::text)</code></pre>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">system.time</span>(<span class="kw">dbGetQuery</span>(db, <span class="st">&quot;select * from questions where creationdate = '2016-05-11 00:00:15'&quot;</span>)) <span class="co"># .006 sec.</span></code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">system.time</span>(<span class="kw">dbGetQuery</span>(db, <span class="st">&quot;select * from questions where</span>
+<span class="st">                           creationdate = '2016-05-11 00:00:15'&quot;</span>)) <span class="co"># .006 sec.</span></code></pre></div>
 <pre><code>##    user  system elapsed 
-##   0.002   0.000   0.009</code></pre>
+##   0.002   0.001   0.011</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;drop index date_index&quot;</span>)</code></pre></div>
 <pre><code>## NULL</code></pre>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;explain select * from questions where creationdate = '2016-05-11 00:00:15'&quot;</span>)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;explain select * from questions where</span>
+<span class="st">               creationdate = '2016-05-11 00:00:15'&quot;</span>)</code></pre></div>
 <pre><code>##                                                      QUERY PLAN
 ## 1 Seq Scan on questions  (cost=0.00..281373.95 rows=1 width=40)
 ## 2          Filter: (creationdate = '2016-05-11 00:00:15'::text)</code></pre>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">system.time</span>(<span class="kw">dbGetQuery</span>(db, <span class="st">&quot;select * from questions where creationdate = '2016-05-11 00:00:15'&quot;</span>)) <span class="co"># 2.2 sec.</span></code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">system.time</span>(<span class="kw">dbGetQuery</span>(db, <span class="st">&quot;select * from questions where</span>
+<span class="st">                           creationdate = '2016-05-11 00:00:15'&quot;</span>)) <span class="co"># 2.2 sec.</span></code></pre></div>
 <pre><code>##    user  system elapsed 
-##   0.003   0.000   2.154</code></pre>
+##   0.002   0.000   2.171</code></pre>
 <p>Here's additional information on interpreting what you see: <a href="https://www.postgresql.org/docs/9.5/static/using-explain.html" class="uri">https://www.postgresql.org/docs/9.5/static/using-explain.html</a>.</p>
 <p>The main thing to look for is to see if the query will be done by using an index or by sequential scan (i.e., looking at all the rows).</p>
 </div>
