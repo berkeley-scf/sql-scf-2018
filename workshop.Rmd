@@ -1,0 +1,757 @@
+% Database/SQL workshop
+% January 2018, UC Berkeley Statistical Computing Facility
+% Chris Paciorek
+
+```{r chunksetup, include=FALSE, cache=TRUE} 
+# include any code here you don't want to show up in the document,
+# e.g. package and dataset loading
+# remember to port forward from gandalf or machine where postgres stackoverflow is before running this
+```
+
+
+# Introduction
+
+This workshop will cover using and administering databases (SQLite and PostgreSQL) and making SQL queries of various complexity (from R and Python).
+
+I'll do a bunch of demo with time for you to work on individual questions as well as a slightly more extended breakout for an extended problem.
+
+This workshop is based on [this SCF tutorial](https://github.com/berkeley-scf/tutorial-databases).
+
+At times I'll ask you to post code/syntax on this shared document: [https://etherpad.net/p/scf-sql-2018](https://etherpad.net/p/scf-sql-2018).
+
+
+# Outline (Part 1)
+
+Here's the outline:
+
+ - Introduction and review
+    - Connecting to a database from R or Python
+    - Basic SQL syntax
+        - basic select statements
+        - basic joins
+        - group by statements
+    - Database schema and normalization
+    - Keys and indexes
+    - View
+ - More advanced SQL syntax
+    - Various joins
+    - Distinct
+    - Set operations
+    - Subqueries
+    - String operations
+ - Breakout with synthesis questions
+
+# Outline (Part 2)
+
+Outline continued:
+
+ - Database administration
+    - SQLite basics
+    - Reading data into SQLite
+    - PostgreSQL basics
+    - Reading data into PostgreSQL
+    - Remote access to PostgreSQL
+ - Efficiency of SQL queries
+    - Indexes
+    - Query plans
+    - Examples
+
+# Background on databases and SQL
+
+Standard SQL databases are *relational* databases:
+
+ - a collection of rectangular format datasets (*tables*, also called *relations*)
+ - each table similar to R or Pandas data frames, in that a table is made up of columns, which are called *fields* or *attributes*
+ - each field contanis a single *type* (numeric, character, date, currency, enumerated (i.e., categorical), ...) and rows or records containing the observations for one entity.
+ - tables generally have fields in common so it makes sense to merge (i.e., join) information from multiple tables. E.g., you might have a database with a table of student information, a table of teacher information and a table of school information.
+
+You can interact with databases in a variety of database systems (DBMS=database management system). Some popular systems are SQLite, MySQL, PostgreSQL, Oracle and Microsoft Access. 
+
+
+# Connecting to a database
+
+Most folks connect to a database from some other program, although database programs offer command-line interfaces as well (as we'll see).
+
+```{r connect-r}
+library(RSQLite)
+drv <- dbDriver("SQLite")
+db <- dbConnect(drv, dbname = 'stackoverflow-2016.db')
+dbListTables(db)
+dbListFields(db, 'questions')
+```
+
+```{python, connect-py}
+import sqlite3 as sq
+db = sq.connect('stackoverflow-2016.db')
+c = db.cursor()
+## find tables by doing query on master table
+## saving in 'res' and printing is just to get around R Markdown limitations
+res = c.execute("select name from sqlite_master where type = 'table'").fetchall()
+print(res)
+```
+
+# SQL
+
+SQL is a declarative language for asking questions / getting information / getting data from a database (aka making queries).
+
+You *declare* what you want and the database's job is to figure out how to get it accurately and quickly.
+
+The result of an SQL query is in general another table, though in some cases it might have only one row and/or one column.
+
+For what statisticans/data analysts need to do, you'll generally just need to do one or a small number of queries to extract the data you need and then you'll work with it in the program of your choice.
+
+
+# Basic SQL
+
+Here's the basic form of a query with SQL keywords in CAPITALS.
+
+```
+SELECT <column(s)> FROM <table> WHERE <condition(s) on column(s)> ORDER BY <column(s)>
+```
+
+```{r, basic-r}
+dbGetQuery(db, "select * from questions limit 3")
+dbGetQuery(db, "select title,viewcount,score from questions where viewcount > 10000
+               limit 3")
+dbGetQuery(db, "select title,viewcount,score from questions where viewcount > 10000
+               and score > 10 limit 3")
+```
+
+```{python, basic-python}
+import sqlite3 as sq
+db = sq.connect('stackoverflow-2016.db')
+c = db.cursor()
+c.execute("select * from questions limit 3").fetchall()
+c.execute("select title,viewcount,score from questions where viewcount > 10000 limit 3").fetchall()
+c.execute("select title,viewcount,score from questions where viewcount > 10000 and score > 10 limit 3").fetchall()
+res = c.execute("select title,viewcount,score from questions where viewcount > 10000 order by viewcount desc limit 5").fetchall()
+print(res)
+```
+
+# More example queries
+
+```{r, basic-r-2}
+dbGetQuery(db, "select title,viewcount,score from questions
+               where viewcount > 10000 order by viewcount desc limit 5")
+dbGetQuery(db, "select * from users where location like '%berkeley%' limit 5")
+dbGetQuery(db, "select count(*) from users where location like '%berkeley%'")
+dbGetQuery(db, "select distinct(location) from users
+               where location like '%berkeley%'")
+```
+
+```{python, basic-python-2, eval=FALSE}
+c.execute("select title,viewcount,score from questions where viewcount > 10000 order by viewcount desc limit 5").fetchall()
+c.execute("select * from users where location like '%Berkeley%' limit 5").fetchall()
+c.execute("select count(*) from users where location like '%berkeley%'").fetchall()
+c.execute("select distinct(location) from users where location like '%berkeley%')
+```
+
+# Breakout questions
+
+- Find the oldest users in the database.
+
+- What are some of the tags that are used?
+
+- How many records are in each of the tables in the database?
+
+# Basic joins
+
+Often the data you want are in multiple tables. In fact the idea of normalization often suggests that data should be split across multiple tables, often to limit redundancy (more later).
+
+A join merges data across multiple tables based on matching rows in one table to rows in another table where a pair of rows have the same value(s) for one or more columns.
+
+Let's see some example joins:
+
+```{r, joins-r}
+dbGetQuery(db, "select * from questions join questions_tags
+               on questions.questionid = questions_tags.questionid limit 5")
+dbGetQuery(db, "select count(*) from questions")
+dbGetQuery(db, "select count(*) from questions Q join questions_tags T
+               on Q.questionid = T.questionid")
+```
+
+# Breakout questions
+
+- Write a query that would return all the questions with the Python tag.
+- Find the questions with answers that have scores greater than 100.
+- Find the question that has the answer with the maximum score.
+
+# Grouping with group by statements
+
+You can use `group by` to group/aggregate/stratify the data and then compute summary statistics for each of the groups. The result is a new table with as many rows as groups.
+
+```{r, groupby-r}
+dbGetQuery(db, "select tag, count(*) from questions_tags group by tag limit 5")
+dbGetQuery(db, "select tag, count(*) as n from questions_tags group by tag
+               order by n desc limit 20")
+```
+
+# Breakout questions
+
+- Who has provided the most answers?
+- Amongst the Berkeley users, who has the most answers?
+- Find the top few most answered questions.
+- What is the average score on questions, grouped by tag?
+
+# Schema and normalization
+
+To truly leverage the conceptual and computational power of a database you'll want to have your data in a normalized form, which means spreading your data across multiple tables in such a way that you don't repeat information unnecessarily.
+
+The schema is the metadata about the tables in the database and the fields (and their types) in those tables.
+
+Here is the [normalized schema for the Stack Overflow data](stackoverflow-schema.png).
+
+# Why normalize?
+
+Alternatives that put all the data into one table would look like this if we have one row per question:
+
+ - question ID
+ - ID of user submitting question
+ - user location
+ - user age
+ - question title
+ - tag 1
+ - tag 2 
+ - ...
+ - tag n
+ - answer 1 ID
+ - ID of user submitting answer 1
+ - location of first user answering
+ - age of first user answering
+ - answer 2 ID
+ - ID of user submitting answer 2 
+ - location of second user answering
+ - age of second user answering
+ - ...
+
+# Why normalize (2)?
+
+or like this if we have one row per question-answer pair:
+
+ - question ID
+ - ID of user submitting question
+ - user location
+ - user age
+ - question title
+ - tag 1
+ - tag 2
+ - ...
+ - tag n
+ - answer ID
+ - ID of user submitting answer
+ - answerer location
+ - answerer age
+
+# Keys and indexes
+
+A (primary) key is a field or collection of fields that give(s) a unique value for every row/observation. Foreign keys are columns in one table that give the value of the primary key in another table.
+
+Primary keys are enforced to be unique as a quality control measure while foreign keys are enforced such that the value of the foreign key exists in the primary key.
+
+An index is an ordering of rows based on one or more fields. DBMS use indexes to look up values quickly, either when filtering (if the index is involved in the WHERE condition) or when doing joins (if the index is involved in the JOIN condition). More on this later.
+
+Primary keys may also be set up as indexes by the database. 
+
+# Temporary tables and views
+
+You can think of a view as a temporary table that is the result of a query and can be used in subsequent queries. In any given query you can use both views and tables. The advantage is that they provide modularity in our querying. For example, if a given operation (portion of a query) is needed repeatedly, one could abstract that as a view and then make use of that view.
+
+Suppose we always want the age and displayname of question owners available. Once we have the view we can query it like a regular table.
+
+```{r, view}
+## note there is a creationdate in users too, hence disambiguation
+dbGetQuery(db, "create view questionsAugment as select
+               questionid, questions.creationdate, score, viewcount, title,
+               ownerid, age, displayname
+               from questions join users on questions.ownerid = users.userid")
+## don't be confused by the "data frame with 0 columns and 0 rows" message --
+## it just means that nothing is returned to R; the view _has_ been created
+               
+dbGetQuery(db, "select * from questionsAugment where age > 75 limit 5")
+```
+
+```{r, drop-view, include=FALSE}
+dbGetQuery(db, "drop view questionsAugment") # drop so our database is clean
+```
+              
+One use of a view would be to create a mega table that stores all the information from multiple tables in the (unnormalized) form you might have if you simply had one data frame in R or Python.
+
+# Various kinds of joins
+
+Here's a table of the different kinds of joins:
+
+|  Type of join          |   Rows from first table  | Rows from second table
+|------------------------|--------------------------|---------------------------------------------
+| inner (default)       |   all that match on specified condition        | all that match on specified condition
+| left outer             |   all                    | all that match first
+| right outer            |   all that match second | all 
+| full outer             |   all                    | all
+| cross                  |   all combined pairwise with second | all combined pairwise with first
+
+Outer joins basically add in non-matching rows from one or both tables to the result of an inner join.
+
+# Implicit joins
+
+Simply listing two or more tables separated by commas as we saw earlier is the same as a *cross join*.
+
+```
+select * from table1 cross join table2  ## cross join
+select * from table1, table2            ## without explicit JOIN
+```
+
+Alternatively, listing two or more tables separated by commas, followed by conditions that equate rows in one table to rows in another is the same as an *inner join*. 
+
+```
+select * from table1 join table2 on table1.id = table2.id ## explicit inner join
+select * from table1, table2 where table1.id = table2.id  ## without explicit JOIN
+select * from table1 cross join table2 where table1.id = table2.id 
+select * from table1 join table2 using(id)
+```
+
+# Self joins
+
+Sometimes we want to query information across rows of the same table. For example supposed we want to analyze the time lags between when the same person posts a question. Do people tend to post in bursts or do they tend to post uniformly over the year? To do this we need contrasts between the times of the different posts.
+
+So we need to join two copies of the same table, which means dealing with resolving the multiple copies of each column.
+
+This would look like this:
+```{r, eval=FALSE}
+dbGetQuery(db, "create view question_contrasts as
+               select * from questions Q1 join questions Q2
+               on Q1.ownerid = Q2.ownerid")
+```
+
+That should create a new table (actually a view -- a kind of virtual table) with all pairs of questions asked by a single person.
+
+Actually, there's a problem here.
+
+***Challenge***: What kinds of rows will we get that we don't want?
+
+# Self joins (2)
+
+A solution to that problem of having the same question paired with itself is:
+
+```{r, eval=FALSE}
+dbGetQuery(db, "create view question_contrasts as
+               select * from questions Q1 join questions Q2
+               on Q1.ownerid = Q2.ownerid
+               where Q1.creationdate != Q2.creationdate")
+```
+
+***Challenge***: There's actually a further similar problem. What is the problem and how can we fix it by changing two characters in the query above? Hint, even as character strings, the creationdate column has an ordering.
+
+# Breakout questions
+
+- Create a view with one row for every question-tag pair. Check you get the same result with an explicit inner join and an implicit inner join.
+
+- Create a view with one row for every question-tag pair, including questions without any tags. How many have no tags?
+The NULL keyword will come in handy -- it's like `NA` in R.
+
+- How many questions are tagged with both 'R' and 'python'? Be careful - it's easy to overcount here.
+
+# Distinct
+
+A useful SQL keyword is DISTINCT, which allows you to eliminate duplicate rows from any table (or remove duplicate values when one only has a single column or set of values).
+
+```{r, distinct}
+tagNames <- dbGetQuery(db, "select distinct tag from questions_tags limit 10")
+dbGetQuery(db, "select count(distinct tag) from questions_tags")
+```
+
+# Breakout questions
+
+- How many users have asked a question with a Python tag. How about an R tag? 
+
+
+# Set operations: UNION, INTERSECT, EXCEPT
+
+You can do set operations like union, intersection, and set difference using the UNION, INTERSECT, and EXCEPT keywords on tables that have the same schema (same column names and types), though most often these would be used on single columns (i.e., single-column tables).
+
+Note that one can often set up an equivalent query without using INTERSECT or UNION.
+
+Here's an example of a query that can be done with or without an intersection. Suppose we want to know the names of all individuals who have asked both an R question and a Python question. We can do this with INTERSECT:
+
+
+```{r, intersect-r, eval=FALSE}
+resultRandPy <- dbGetQuery(db, "select displayname, userid from
+               questions Q join users U on U.userid = Q.ownerid
+               join questions_tags T on Q.questionid = T.questionid
+               where tag = 'r'
+               intersect
+               select displayname, userid from
+               questions Q join users U on U.userid = Q.ownerid
+               join questions_tags T on Q.questionid = T.questionid
+               where tag = 'python'")
+```
+
+Or for those who have asked an R question but not a Python question:
+
+```{r, except, eval=FALSE}
+resultRonly <- dbGetQuery(db, "select displayname, userid from
+               questions Q join users U on U.userid = Q.ownerid
+               join questions_tags T on Q.questionid = T.questionid
+               where tag = 'r'
+               except
+               select displayname, userid from
+               questions Q join users U on U.userid = Q.ownerid
+               join questions_tags T on Q.questionid = T.questionid
+               where tag = 'python'")
+```
+
+Should we be using DISTINCT here?
+
+# Breakout questions
+
+- How many questions have no tags (again)? Figure out how to do this with a set operation rather than an outer join.
+
+- How would you tabulate the combined number of questions and answers for each month of each year? You'd need a string operation not available in SQLite to extract the month-year only from the dates -- for the purpose of the question assume you have a field named 'year-month'.
+
+
+# Subqueries (in the WHERE statement)
+
+Instead of a join, we can use subqueries as a way to combine information across tables, with the subquery involved in a WHERE statement. For example, suppose we want to know the average number of upvotes for users who have posted a question with the tag "python".
+
+```{r, subquery-where}
+dbGetQuery(db, "select avg(upvotes) from users where userid in
+               (select distinct ownerid from
+               questions join questions_tags
+               on questions.questionid = questions_tags.questionid
+               where tag = 'python')")        
+```
+
+# Subqueries (in the FROM statement)
+
+You can also use subqueries in FROM clauses to create temporary tables that are queried, or in the SELECT clause to create new variables.
+
+Here we'll do use a subquery in the FROM in the context of a join. What does the following do?
+
+```{r, subquery-from, eval=FALSE}
+dbGetQuery(db, "select * from questions Q join
+               questions_tags T on Q.questionid = T.questionid
+               join
+               (select max(viewcount) as maxview, tag from questions Q2
+               join questions_tags T2 on Q2.questionid = T2.questionid
+               group by tag) M
+               on M.tag = T.tag
+               where viewcount >= maxview
+               order by viewcount desc limit 10")
+```
+
+# Breakout questions
+
+- What does the query on the previous slide do?
+
+- Use a subquery to write a query that would return the tags for questions asked by users older than 75.
+
+- Now extend that to count the number of questions for each tag for the older users. We could see if that were different from the most-used tags seen in an early slide.
+
+- What's wrong with the following query as an attempt to determine the average upvotes for Python-posting users? Note that the only way to do this is with the subquery we saw recently.
+
+```
+dbGetQuery(db, "select avg(upvotes) from questions, questions_tags, users
+               where questions.questionid = questions_tags.questionid and
+               questions.ownerid = users.userid and
+               tag = 'python'")
+```
+
+# String operations
+
+In Postgres, in addition the basic use of LIKE to match character strings, one can regular expression syntax with SIMILAR TO and one can extract substrings with SUBSTRING.
+
+These keywords are not available in SQLite so the following can only be done in the Postgres instance of our example database. Here we'll look for all tags that are of the form "r-", "-r", "r" or "-r-". SQL uses % as a wildcard (this is not standard regular expression syntax). 
+
+```{r, string, eval=FALSE}
+dbGetQuery(db, "select * from questions_tags where tag
+               similar to 'r-%|%-r|r|%-r-%' limit 10")
+```
+
+To extract substrings we use SUBSTRING. Postgres requires that the pattern to be extracted be surrounded by `#"` (one could use another character in place of `#`), but for use from R we need to escape the double-quote with a backslash so it is treated as a part of the string passed to Postgres and not treated by R as indicating where the character string stops/starts. 
+
+```{r, substring, eval=FALSE}
+dbGetQuery(db, "select substring(creationdate from '#\"[[:digit:]]{4}#\"%' for '#')
+               as year
+               from questions limit 3")
+```
+
+
+# Synthesis breakout questions
+
+- How many questions have 0, 1, 2, 3, etc. answers? You'll need a 'group by' and multiple queries.
+
+- Suppose you wanted to understand the co-occurrence of tags. Count the number of co-occurrences of all tags.
+
+# SQLite basics
+
+You can create a new SQLite database and new tables from with R or Python by simply opening a non-existing database and then creating tables from data structures in R or Python (e.g., by using `dbWriteTable()` in R).
+
+However, you can also administer an SQLite database from the SQLite command line.
+
+To start the SQLite interpreter in Linux, either operating on or creating a database named `wikistats.db`:
+```
+sqlite3 wikistats.db
+```
+
+Here's the syntax to create a table:
+```
+create table webtraffic
+(date char(8), hour char(6), site varchar, page varchar,
+      count integer, size double precision);
+.quit
+```
+
+This can be particularly handy when reading data into an SQLite database.
+
+# Reading data into SQLite
+
+Here's an example of reading from multiple files into SQLite using the command line.
+We create a file `import.sql` that has the configuration for the import:
+```
+.separator " "
+.import /dev/stdin webtraffic
+```
+
+Then we can iterate through our files from the UNIX shell, piping the output of gzip to the `sqlite3` interpreter:
+
+```
+for file in $(ls part*gz); do
+    echo "copying $file"
+    gzip -cd $file | sqlite3 wikistats.db '.read import.sql'
+done
+```
+
+# Reading data into SQLite (data cleaning)
+
+The problem in this example with importing into SQLite is the presence of double quote (") characters that are not meant to delineate strings but are actually part of a field. In this case probably the easiest thing is simply to strip out those quotes from UNIX. Here we use `sed` to search and replace to create versions of the input files that don't have the quotes.
+
+```
+for file in $(ls *gz); do
+    echo "copying $file"
+    gzip -cd $file | sed  "s/\"//g" | sqlite3 wikistats.db '.read import.sql'
+done
+```
+
+# PostgreSQL background
+
+There are a variety of relational database management systems (DBMS).
+
+Other than SQLite, most databases (i.e., DBMS) use a client-server model, where the user connects to a database running on a server machine.
+
+Multiple users can often access the same database.
+
+We'll focus on PostgreSQL as an example of this kind of operation because is is a popular open-source DBMS that is a good representative of a client-server model and has some functionality that SQLite lacks.
+
+# PostgreSQL setup
+
+First make sure Postgres is installed on your machine.
+
+On Ubuntu, you can install Postgres easily via `apt-get` and then start the Postgres server:
+```
+sudo apt-get install postgresql postgresql-contrib
+/etc/init.d/postgresql start
+```
+
+To do this on a Mac or Windows machine, a good option is to set up a Linux virtual machine (called a Docker container) using Docker. You can follow the instructions in `docker.sh` to start the Docker container and set up PostgreSQL.
+
+# Setting up PostgreSQL database
+
+To do this you have to have the ability to be the appropriate user on the server machine, here the `postgres` user.
+
+```
+ssh gandalf  # we have postgres running on the server 'gandalf'
+sudo su - postgres # become the postgres user
+psql  # start postgres interpreter
+```
+
+Now from within the Postgres interpreter, you can create a database, tables within the database, and authenticate users to do things with those tables. 
+
+In this case we'll be explicit about where on the disk filesystem the database is stored, but you probably only need to worry about this if you are creating a large database. 
+
+```
+show data_directory;
+create tablespace dbspace location '/tmp/pg';
+create database wikistats tablespace dbspace;
+create user paciorek with password 'test';
+grant all privileges on database wikistats to paciorek;
+\l  # list databases
+```
+
+# Creating tables
+
+```
+\connect wikistats
+create table webtraffic (date char(8), hour char(6), site varchar, page varchar,
+       count integer, size double precision);
+grant all privileges on table webtraffic to paciorek;
+\dt   # describe tables
+\quit
+```
+
+Note the use of `\` to do administrative tasks (as opposed to executing SQL syntax), and the use of `;` to end each statement. Without the semicolon, Postgres will return without doing anything.
+
+# Reading data into PostgreSQL
+
+```
+\connect wikistats
+copy webtraffic from 'part-00000' delimiter ' ';  # for space-delimited
+copy webtraffic from 'part-00000' csv;  # for CSV
+```
+
+To actually handle the Wikistats input files, we need to deal with backslash characters occurring at the end of text for a given column in some rows. This syntax does it, but interpreting it is fairly complicated - see Section 2.5.2 of the tutorial for more details.
+
+```
+copy webtraffic from 'part-00000' delimiter ' ' quote e'\b' csv;
+```
+
+# Reading data into PostgreSQL (2)
+
+Here's an example of looping through multiple files and adding them to a table in the database.
+
+```
+export PGPASSWORD=test  # set password via UNIX environment variable
+for file in $(ls part*gz); do
+  # loop thru files whose names start with 'part' and end with 'gz'
+  echo "copying $file"
+  ## unzip and then pass by UNIX pipe to psql run in non-interactive mode
+  gzip -cd $file |
+    psql -d wikistats -h localhost -U paciorek -p 5432 -c \
+    "\copy webtraffic from stdin delimiter ' ' quote e'\b' csv"
+done
+```
+
+# Remote access to PostgreSQL: setup
+
+If you're logged into the server running the database, you don't need to specify the host or port for the database.
+
+If you're accessing from another machine on a network (e.g., in the SCF), you can forward the port used by the database (5432) to an unused port on your local machine (let's say it's 63333) and then connect to that port.
+
+You can forward a port on Mac or Linux like this:
+
+```
+ssh -L 63333:localhost:5432 yourUserName@gandalf.berkeley.edu
+```
+
+For Windows, see [https://www.akadia.com/services/ssh_putty.html](https://www.akadia.com/services/ssh_putty.html). Specifically, put 63333 as the 'Source port' and '127.0.0.1:5432' as the Destination.
+
+To connect to PostgreSQL in a Docker container you'll also need to forward the port:
+
+```
+docker run -p 63333:5432 -ti rocker/r-base /bin/bash
+```
+
+# Remote access to PostgreSQL: connecting
+
+Now in R or Python, connect to the database using RPostgreSQL or psycopg2 with host='localhost' and port=63333. For example,
+
+```{r, sqlite-disconnect, include=FALSE}
+dbDisconnect(db)
+```
+
+```{r, postgres-load, eval=TRUE}
+library(RPostgreSQL)
+drv <- dbDriver("PostgreSQL")
+db <- dbConnect(drv, dbname = 'stackoverflow', user = 'paciorek',
+                     port = 63333, password = 'test', host = 'localhost')
+```                     
+
+
+# Efficiency of SQL queries
+
+Some tips for faster queries include:
+
+ - use indexes on fields used in WHERE and JOIN clauses
+    - try to avoid wildcards at the start of LIKE string comparison when you have an index on the field (as this requires looking at all of the rows)
+    - similarly try to avoid using functions on indexed columns in a WHERE clause as this requires doing the calculation on all the rows in order to check the condition
+ - only select the columns you really need
+ - use a temporary table if you would otherwise carry out a query repeatedly on a large table
+ - use filtering (WHERE clauses) in inner statements when you have nested subqueries
+ - use LIMIT as seen in the examples here if you only need some of the rows a query returns
+
+
+# Using indexes
+
+An index is an ordering of rows based on one or more fields. DBMS use indexes to look up values quickly, either when filtering (if the index is involved in the WHERE condition) or when doing joins (if the index is involved in the JOIN condition).  So in general you want your tables to have indexes.
+
+DBMS use indexing to provide sub-linear time lookup. Without indexes, a database needs to scan through every row sequentially, which is called linear time lookup -- if there are n rows, the lookup is $O(n)$ in computational cost. With indexes, lookup may be logarithmic -- O(log(n)) -- (if using tree-based indexes) or constant time -- O(1) -- (if using hash-based indexes). A binary tree-based search is logarithmic; at each step through the tree you can eliminate half of the possibilities. 
+
+Here's how we create an index, with some time comparison for a simple query.
+
+```{r, eval=FALSE}
+system.time(dbGetQuery(db, "select * from questions_tags where tag = 'r'"))  # 10 seconds
+system.time(dbGetQuery(db, "create index tag_index on questions_tags(tag)")) # 21 seconds
+system.time(dbGetQuery(db, "select * from questions_tags where tag = 'r'"))  #  6 seconds
+dbGetQuery(db, "drop index tag_index")    
+```
+
+In other contexts the speedup can be much more impressive.
+
+# SQL query plans and EXPLAIN
+
+You can actually examine the query plan that the system is going to use for a query using the EXPLAIN keyword. We'll do this in PostgreSQL as the output is more user-friendly.
+
+Here we see that even after putting an index, this string-based query is still done as a sequential scan through all of the rows. 
+
+```{r, explain}
+dbGetQuery(db, "explain select * from questions where creationdate like '2016-05-11%'")
+system.time(result <- dbGetQuery(db, "select * from questions
+                   where creationdate like '2016-05-11%'"))  # 2.6 sec.
+dbGetQuery(db, "create index date_index on questions(creationdate)")
+dbGetQuery(db, "explain select * from questions where creationdate like '2016-05-11%'")
+system.time(result <- dbGetQuery(db, "select * from questions
+                   where creationdate like '2016-05-11%'"))  # 2.6 sec. (still a sequential scan)
+```
+
+# SQL query plans and EXPLAIN (2)
+
+However, if we look for an exact value, then we see that the index is used when it's available.
+```{r, explain2}
+dbGetQuery(db, "explain select * from questions where
+               creationdate = '2016-05-11 00:00:15'")
+system.time(dbGetQuery(db, "select * from questions where
+                           creationdate = '2016-05-11 00:00:15'")) # .006 sec.
+dbGetQuery(db, "drop index date_index")
+dbGetQuery(db, "explain select * from questions where
+               creationdate = '2016-05-11 00:00:15'")
+system.time(dbGetQuery(db, "select * from questions where
+                           creationdate = '2016-05-11 00:00:15'")) # 2.2 sec.
+```
+
+Here's additional information on interpreting what you see: [https://www.postgresql.org/docs/9.5/static/using-explain.html](https://www.postgresql.org/docs/9.5/static/using-explain.html).
+
+The main thing to look for is to see if the query will be done by using an index or by sequential scan (i.e., looking at all the rows). 
+
+# Index lookup vs. sequential scan 
+
+Using an index is good in that can go to the data needed very quickly based on random access to the disk locations of the data of interest, but if it requires the computer to examine a large number of rows, it may not be better than sequential scan. An advantage of sequential scan is that it will make good use of the CPU cache, reading chunks of data and then accessing the individual pieces of data quickly. 
+
+
+# Memory and disk caching
+
+- You might think that database queries will generally be slow (and slower than in-memory manipulation such as in R or Python when all the data can fit in memory) because the database stores the data on disk.
+- However, the operating system will generally cache files/data in memory when it reads from disk. Then if that information is still in memory the next time it is needed, it will be much faster to access it the second time around.
+- Other processes might need memory and 'invalidate' the cache, but often once the data is read once, the database will be able to do queries quite quickly.
+
+# Examples (1)
+
+Should an inner join be faster than a cross join with a WHERE that restricts to matches?
+
+```{r, query-speed}
+dbGetQuery(db, "explain select * from questions Q join
+               questions_tags T on Q.questionid = T.questionid")
+dbGetQuery(db, "explain select * from questions Q cross join
+               questions_tags T where Q.questionid = T.questionid")
+```
+
+Here's a basic interpretation: the plan is to carry out a hash join (which loads data from one table into a hash table and then checks each record in the other table against that hash table). This involves sequentially scanning through both tables (on questions_tags to create the hash table and on questions to look for matches against the hash table).
+
+# Examples (2)
+
+Should a join that first subsets the first table be faster than a join that subsets the result?
+
+```{r, query-speed2}
+dbGetQuery(db, "explain select * from questions Q join
+               questions_tags T on Q.questionid = T.questionid where tag = 'python'")
+dbGetQuery(db, "explain select * from questions Q join
+               (select * from questions_tags where tag = 'python') T2
+               on Q.questionid = T2.questionid")
+```
+
