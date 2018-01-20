@@ -10,23 +10,26 @@
 
 
 ## Run a container with R already installed, starting a bash shell terminal session in the container. Also forward port 5432 on the container to local port 63333 for later use.
-docker run --rm -p 63333:5432 -ti  rocker/r-base /bin/bash
+docker run -p 63333:5432 -ti  rocker/r-base /bin/bash
 
 ## install Postgres and SSH/SCP (the latter for copying files into the container)
-apt-get install postgresql postgresql-contrib libpq-dev
-apt-get install openssh-client
+apt-get update
+apt-get install -y postgresql postgresql-contrib libpq-dev
+apt-get install -y openssh-client
 
 ## If you want to be able to connect to postgres from outside the container, do these steps:
 PG_VER=10  # modify as needed
-echo -e "host\tall\t\tall\t\t0.0.0.0/0\t\tmd5" >> /etc/postgresql/PG_VER/main/pg_hba.conf
-sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/PG_VER/main/postgresql.conf
+echo -e "host\tall\t\tall\t\t0.0.0.0/0\t\tmd5" >> /etc/postgresql/${PG_VER}/main/pg_hba.conf
+sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/${PG_VER}/main/postgresql.conf
 
 ## start the postgres server process
 /etc/init.d/postgresql start
 
 ## get the data into the container
 mkdir /data
-scp paciorek@smeagol.berkeley.edu:~/share/tutorial-databases-data.zip /data/.
+cd /data
+wget https://www.stat.berkeley.edu/share/paciorek/tutorial-databases-data.zip
+unzip tutorial-databases-data.zip
 
 ## switch to be the postgres user and create the database and add data
 su - postgres

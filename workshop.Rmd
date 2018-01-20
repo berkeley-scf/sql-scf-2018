@@ -172,9 +172,11 @@ dbGetQuery(db, "select count(*) from questions Q join questions_tags T
 
 # Breakout questions
 
-- Write a query that would return all the questions with the Python tag.
+- How many questions have the Python tag.
+
 - Find the questions with answers that have scores greater than 100.
-- Find the question that has the answer with the maximum score.
+
+- Find the question that has the answer with the maximum score. (We'll see a more elegant way to do this later...)
 
 # Grouping with group by statements
 
@@ -189,8 +191,11 @@ dbGetQuery(db, "select tag, count(*) as n from questions_tags group by tag
 # Breakout questions
 
 - Who has provided the most answers?
+
 - Amongst the Berkeley users, who has the most answers?
+
 - Find the top few most answered questions.
+
 - What is the average score on questions, grouped by tag?
 
 # Schema and normalization
@@ -342,7 +347,7 @@ dbGetQuery(db, "select * from questions Q1 join questions Q2
 
 - Run a query that produces one row for every question-tag pair. Check you get the same result with an explicit inner join and an implicit inner join.
 
-- Run a query that produces one row for every question-tag pair, including questions without any tags. How many have no tags?
+- Run a query that produces one row for every question-answer pair, including answers without quetions. How many such answers are there?
 The NULL keyword will come in handy -- it's like `NA` in R.
 
 - How many questions are tagged with both 'R' and 'python'? Be careful - it's easy to overcount here.
@@ -400,9 +405,9 @@ Should we be using DISTINCT here?
 
 # Breakout questions
 
-- How many questions have no tags (again)? Figure out how to do this with a set operation rather than an outer join.
+- How many answers have no questions (again)? Figure out how to do this with a set operation rather than an outer join.
 
-- How would you tabulate the combined number of questions and answers for each month of each year? You'd need a string operation not available in SQLite to extract the month-year only from the dates -- for the purpose of the question assume you have a field named 'year-month'.
+- How would you tabulate the combined number of questions and answers for each month of each year? You'd need a string operation not available in SQLite to extract the month-year only from the dates -- for the purpose of the question assume you have a field named 'year-month'. (Hint: start by combining questions and answers before doing the tabulation.)
 
 
 # Subqueries (in the WHERE statement)
@@ -439,6 +444,8 @@ dbGetQuery(db, "select * from questions Q join
 
 - What does the query on the previous slide do?
 
+- How many answers are there without questions (again - do it with a subquery).
+
 - Use a subquery to write a query that would return the tags for questions asked by users older than 75.
 
 - Now extend that to count the number of questions for each tag for the older users. We could see if that were different from the most-used tags seen in an early slide.
@@ -446,11 +453,14 @@ dbGetQuery(db, "select * from questions Q join
 - What's wrong with the following query as an attempt to determine the average upvotes for Python-posting users? Note that the only way to do this is with the subquery we saw recently.
 
 ```
-dbGetQuery(db, "select avg(upvotes) from questions, questions_tags, users
-               where questions.questionid = questions_tags.questionid and
-               questions.ownerid = users.userid and
+dbGetQuery(db, "select avg(upvotes) from questions Q , questions_tags T, users U
+               where Q.questionid = T.questionid and
+               Q.ownerid = U.userid and
                tag = 'python'")
 ```
+
+- How many users have asked a question with a Python tag (again - do it with a subquery).
+
 
 # String operations
 
@@ -474,9 +484,12 @@ dbGetQuery(db, "select substring(creationdate from '#\"[[:digit:]]{4}#\"%' for '
 
 # Synthesis breakout questions
 
-- How many questions have 0, 1, 2, 3, etc. answers? You'll need a 'group by' and multiple queries.
+- How many questions have 0, 1, 2, 3, etc. answers? How about grouped by tag? 
 
 - Suppose you wanted to understand the co-occurrence of tags. Count the number of co-occurrences of all tags.
+
+- Get the data you would need to do a statistical analysis asking whether users with a higher reputation are more likely to have more or fewer answers to their questions. What about a higher score for their questions?
+
 
 # SQLite basics
 
@@ -640,14 +653,11 @@ docker run -p 63333:5432 -ti rocker/r-base /bin/bash
 
 Now in R or Python, connect to the database using RPostgreSQL or psycopg2 with host='localhost' and port=63333. For example,
 
-```{r, sqlite-disconnect, include=FALSE}
-dbDisconnect(db)
-```
 
 ```{r, postgres-load, eval=TRUE}
 library(RPostgreSQL)
 drv <- dbDriver("PostgreSQL")
-db <- dbConnect(drv, dbname = 'stackoverflow', user = 'paciorek',
+db2 <- dbConnect(drv, dbname = 'wikistats', user = 'paciorek',
                      port = 63333, password = 'test', host = 'localhost')
 ```                     
 
@@ -660,7 +670,7 @@ Some tips for faster queries include:
     - try to avoid wildcards at the start of LIKE string comparison when you have an index on the field (as this requires looking at all of the rows)
     - similarly try to avoid using functions on indexed columns in a WHERE clause as this requires doing the calculation on all the rows in order to check the condition
  - only select the columns you really need
- - use a temporary table if you would otherwise carry out a query repeatedly on a large table
+ - create (temporary) tables to store intermediate results that you need to query repeatedly
  - use filtering (WHERE clauses) in inner statements when you have nested subqueries
  - use LIMIT as seen in the examples here if you only need some of the rows a query returns
 
@@ -686,7 +696,14 @@ In other contexts the speedup can be much more impressive.
 
 You can actually examine the query plan that the system is going to use for a query using the EXPLAIN keyword. We'll do this in PostgreSQL as the output is more user-friendly.
 
+```{r, sqlite-disconnect}
+dbDisconnect(db)
+db <- dbConnect(drv, dbname = 'stackoverflow', user = 'paciorek',
+                     port = 63333, password = 'test', host = 'localhost')
+```
+
 Here we see that even after putting an index, this string-based query is still done as a sequential scan through all of the rows. 
+
 
 ```{r, explain}
 dbGetQuery(db, "explain select * from questions where creationdate like '2016-05-11%'")

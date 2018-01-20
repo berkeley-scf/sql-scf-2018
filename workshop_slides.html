@@ -129,7 +129,8 @@ January 2018, UC Berkeley Statistical Computing Facility
 drv &lt;-<span class="st"> </span><span class="kw">dbDriver</span>(<span class="st">&quot;SQLite&quot;</span>)
 db &lt;-<span class="st"> </span><span class="kw">dbConnect</span>(drv, <span class="dt">dbname =</span> <span class="st">'stackoverflow-2016.db'</span>)
 <span class="kw">dbListTables</span>(db)</code></pre></div>
-<pre><code>## [1] &quot;answers&quot;        &quot;questions&quot;      &quot;questions_tags&quot; &quot;users&quot;</code></pre>
+<pre><code>## [1] &quot;answers&quot;        &quot;qplust&quot;         &quot;questions&quot;      &quot;questions_tags&quot;
+## [5] &quot;users&quot;</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbListFields</span>(db, <span class="st">'questions'</span>)</code></pre></div>
 <pre><code>## [1] &quot;questionid&quot;   &quot;creationdate&quot; &quot;score&quot;        &quot;viewcount&quot;   
 ## [5] &quot;title&quot;        &quot;ownerid&quot;</code></pre>
@@ -294,9 +295,9 @@ c.execute(<span class="st">&quot;select distinct(location) from users where loca
 <div id="breakout-questions-1" class="slide section level1">
 <h1>Breakout questions</h1>
 <ul>
-<li>Write a query that would return all the questions with the Python tag.</li>
-<li>Find the questions with answers that have scores greater than 100.</li>
-<li>Find the question that has the answer with the maximum score.</li>
+<li><p>How many questions have the Python tag.</p></li>
+<li><p>Find the questions with answers that have scores greater than 100.</p></li>
+<li><p>Find the question that has the answer with the maximum score. (We'll see a more elegant way to do this later...)</p></li>
 </ul>
 </div>
 <div id="grouping-with-group-by-statements" class="slide section level1">
@@ -336,10 +337,10 @@ c.execute(<span class="st">&quot;select distinct(location) from users where loca
 <div id="breakout-questions-2" class="slide section level1">
 <h1>Breakout questions</h1>
 <ul>
-<li>Who has provided the most answers?</li>
-<li>Amongst the Berkeley users, who has the most answers?</li>
-<li>Find the top few most answered questions.</li>
-<li>What is the average score on questions, grouped by tag?</li>
+<li><p>Who has provided the most answers?</p></li>
+<li><p>Amongst the Berkeley users, who has the most answers?</p></li>
+<li><p>Find the top few most answered questions.</p></li>
+<li><p>What is the average score on questions, grouped by tag?</p></li>
 </ul>
 </div>
 <div id="schema-and-normalization" class="slide section level1">
@@ -494,18 +495,16 @@ select * from table1 join table2 using(id)</code></pre>
 <p>Sometimes we want to query information across rows of the same table. For example supposed we want to analyze the time lags between when the same person posts a question. Do people tend to post in bursts or do they tend to post uniformly over the year? To do this we need contrasts between the times of the different posts.</p>
 <p>So we need to join two copies of the same table, which means dealing with resolving the multiple copies of each column.</p>
 <p>This would look like this:</p>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;create view question_contrasts as</span>
-<span class="st">               select * from questions Q1 join questions Q2</span>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;select * from questions Q1 join questions Q2</span>
 <span class="st">               on Q1.ownerid = Q2.ownerid&quot;</span>)</code></pre></div>
-<p>That should create a new table (actually a view -- a kind of virtual table) with all pairs of questions asked by a single person.</p>
+<p>That should return a table with all pairs of questions asked by a single person.</p>
 <p>Actually, there's a problem here.</p>
 <p><strong><em>Challenge</em></strong>: What kinds of rows will we get that we don't want?</p>
 </div>
 <div id="self-joins-2" class="slide section level1">
 <h1>Self joins (2)</h1>
 <p>A solution to that problem of having the same question paired with itself is:</p>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;create view question_contrasts as</span>
-<span class="st">               select * from questions Q1 join questions Q2</span>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;select * from questions Q1 join questions Q2</span>
 <span class="st">               on Q1.ownerid = Q2.ownerid</span>
 <span class="st">               where Q1.creationdate != Q2.creationdate&quot;</span>)</code></pre></div>
 <p><strong><em>Challenge</em></strong>: There's actually a further similar problem. What is the problem and how can we fix it by changing two characters in the query above? Hint, even as character strings, the creationdate column has an ordering.</p>
@@ -513,8 +512,8 @@ select * from table1 join table2 using(id)</code></pre>
 <div id="breakout-questions-3" class="slide section level1">
 <h1>Breakout questions</h1>
 <ul>
-<li><p>Create a view with one row for every question-tag pair. Check you get the same result with an explicit inner join and an implicit inner join.</p></li>
-<li><p>Create a view with one row for every question-tag pair, including questions without any tags. How many have no tags? The NULL keyword will come in handy -- it's like <code>NA</code> in R.</p></li>
+<li><p>Run a query that produces one row for every question-tag pair. Check you get the same result with an explicit inner join and an implicit inner join.</p></li>
+<li><p>Run a query that produces one row for every question-answer pair, including answers without quetions. How many such answers are there? The NULL keyword will come in handy -- it's like <code>NA</code> in R.</p></li>
 <li><p>How many questions are tagged with both 'R' and 'python'? Be careful - it's easy to overcount here.</p></li>
 </ul>
 </div>
@@ -561,8 +560,8 @@ select * from table1 join table2 using(id)</code></pre>
 <div id="breakout-questions-5" class="slide section level1">
 <h1>Breakout questions</h1>
 <ul>
-<li><p>How many questions have no tags (again)? Figure out how to do this with a set operation rather than an outer join.</p></li>
-<li><p>How would you tabulate the combined number of questions and answers for each month of each year? You'd need a string operation not available in SQLite to extract the month-year only from the dates -- for the purpose of the question assume you have a field named 'year-month'.</p></li>
+<li><p>How many answers have no questions (again)? Figure out how to do this with a set operation rather than an outer join.</p></li>
+<li><p>How would you tabulate the combined number of questions and answers for each month of each year? You'd need a string operation not available in SQLite to extract the month-year only from the dates -- for the purpose of the question assume you have a field named 'year-month'. (Hint: start by combining questions and answers before doing the tabulation.)</p></li>
 </ul>
 </div>
 <div id="subqueries-in-the-where-statement" class="slide section level1">
@@ -594,14 +593,18 @@ select * from table1 join table2 using(id)</code></pre>
 <h1>Breakout questions</h1>
 <ul>
 <li><p>What does the query on the previous slide do?</p></li>
+<li><p>How many answers are there without questions (again - do it with a subquery).</p></li>
 <li><p>Use a subquery to write a query that would return the tags for questions asked by users older than 75.</p></li>
 <li><p>Now extend that to count the number of questions for each tag for the older users. We could see if that were different from the most-used tags seen in an early slide.</p></li>
 <li><p>What's wrong with the following query as an attempt to determine the average upvotes for Python-posting users? Note that the only way to do this is with the subquery we saw recently.</p></li>
 </ul>
-<pre><code>dbGetQuery(db, &quot;select avg(upvotes) from questions, questions_tags, users
-               where questions.questionid = questions_tags.questionid and
-               questions.ownerid = users.userid and
+<pre><code>dbGetQuery(db, &quot;select avg(upvotes) from questions Q , questions_tags T, users U
+               where Q.questionid = T.questionid and
+               Q.ownerid = U.userid and
                tag = 'python'&quot;)</code></pre>
+<ul>
+<li>How many users have asked a question with a Python tag (again - do it with a subquery).</li>
+</ul>
 </div>
 <div id="string-operations" class="slide section level1">
 <h1>String operations</h1>
@@ -617,8 +620,9 @@ select * from table1 join table2 using(id)</code></pre>
 <div id="synthesis-breakout-questions" class="slide section level1">
 <h1>Synthesis breakout questions</h1>
 <ul>
-<li><p>How many questions have 0, 1, 2, 3, etc. answers? You'll need a 'group by' and multiple queries.</p></li>
+<li><p>How many questions have 0, 1, 2, 3, etc. answers? How about grouped by tag?</p></li>
 <li><p>Suppose you wanted to understand the co-occurrence of tags. Count the number of co-occurrences of all tags.</p></li>
+<li><p>Get the data you would need to do a statistical analysis asking whether users with a higher reputation are more likely to have more or fewer answers to their questions. What about a higher score for their questions?</p></li>
 </ul>
 </div>
 <div id="sqlite-basics" class="slide section level1">
@@ -677,7 +681,7 @@ psql  # start postgres interpreter</code></pre>
 <p>Now from within the Postgres interpreter, you can create a database, tables within the database, and authenticate users to do things with those tables.</p>
 <p>In this case we'll be explicit about where on the disk filesystem the database is stored, but you probably only need to worry about this if you are creating a large database.</p>
 <pre><code>show data_directory;
-create tablespace dbspace location '/tmp/pg';
+create tablespace dbspace location '/var/tmp/pg';
 create database wikistats tablespace dbspace;
 create user paciorek with password 'test';
 grant all privileges on database wikistats to paciorek;
@@ -731,8 +735,10 @@ done</code></pre>
 <pre><code>## Loading required package: methods</code></pre>
 <pre><code>## Loading required package: DBI</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">drv &lt;-<span class="st"> </span><span class="kw">dbDriver</span>(<span class="st">&quot;PostgreSQL&quot;</span>)
-db &lt;-<span class="st"> </span><span class="kw">dbConnect</span>(drv, <span class="dt">dbname =</span> <span class="st">'stackoverflow'</span>, <span class="dt">user =</span> <span class="st">'paciorek'</span>,
+db2 &lt;-<span class="st"> </span><span class="kw">dbConnect</span>(drv, <span class="dt">dbname =</span> <span class="st">'wikistats'</span>, <span class="dt">user =</span> <span class="st">'paciorek'</span>,
                      <span class="dt">port =</span> <span class="dv">63333</span>, <span class="dt">password =</span> <span class="st">'test'</span>, <span class="dt">host =</span> <span class="st">'localhost'</span>)</code></pre></div>
+<pre><code>## Error in postgresqlNewConnection(drv, ...): RS-DBI driver: (could not connect paciorek@localhost on dbname &quot;wikistats&quot;
+## )</code></pre>
 </div>
 <div id="efficiency-of-sql-queries" class="slide section level1">
 <h1>Efficiency of SQL queries</h1>
@@ -744,7 +750,7 @@ db &lt;-<span class="st"> </span><span class="kw">dbConnect</span>(drv, <span cl
 <li>similarly try to avoid using functions on indexed columns in a WHERE clause as this requires doing the calculation on all the rows in order to check the condition</li>
 </ul></li>
 <li>only select the columns you really need</li>
-<li>use a temporary table if you would otherwise carry out a query repeatedly on a large table</li>
+<li>create (temporary) tables to store intermediate results that you need to query repeatedly</li>
 <li>use filtering (WHERE clauses) in inner statements when you have nested subqueries</li>
 <li>use LIMIT as seen in the examples here if you only need some of the rows a query returns</li>
 </ul>
@@ -763,25 +769,28 @@ db &lt;-<span class="st"> </span><span class="kw">dbConnect</span>(drv, <span cl
 <div id="sql-query-plans-and-explain" class="slide section level1">
 <h1>SQL query plans and EXPLAIN</h1>
 <p>You can actually examine the query plan that the system is going to use for a query using the EXPLAIN keyword. We'll do this in PostgreSQL as the output is more user-friendly.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbDisconnect</span>(db)
+db &lt;-<span class="st"> </span><span class="kw">dbConnect</span>(drv, <span class="dt">dbname =</span> <span class="st">'stackoverflow'</span>, <span class="dt">user =</span> <span class="st">'paciorek'</span>,
+                     <span class="dt">port =</span> <span class="dv">63333</span>, <span class="dt">password =</span> <span class="st">'test'</span>, <span class="dt">host =</span> <span class="st">'localhost'</span>)</code></pre></div>
 <p>Here we see that even after putting an index, this string-based query is still done as a sequential scan through all of the rows.</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;explain select * from questions where creationdate like '2016-05-11%'&quot;</span>)</code></pre></div>
-<pre><code>##                                                         QUERY PLAN
-## 1 Seq Scan on questions  (cost=0.00..281373.95 rows=1347 width=40)
-## 2                    Filter: (creationdate ~~ '2016-05-11%'::text)</code></pre>
+<pre><code>##                                                       QUERY PLAN
+## 1 Seq Scan on questions  (cost=0.00..64031.09 rows=281 width=52)
+## 2                  Filter: (creationdate ~~ '2016-05-11%'::text)</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">system.time</span>(result &lt;-<span class="st"> </span><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;select * from questions</span>
 <span class="st">                   where creationdate like '2016-05-11%'&quot;</span>))  <span class="co"># 2.6 sec.</span></code></pre></div>
 <pre><code>##    user  system elapsed 
-##   0.039   0.001   2.641</code></pre>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;create index date_index on questions(creationdate)&quot;</span>)</code></pre></div>
+##   0.029   0.000   0.560</code></pre>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;create index date_index on questions(creationdate)&quot;</span>) <span class="co"># takes a long time</span></code></pre></div>
 <pre><code>## NULL</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;explain select * from questions where creationdate like '2016-05-11%'&quot;</span>)</code></pre></div>
-<pre><code>##                                                         QUERY PLAN
-## 1 Seq Scan on questions  (cost=0.00..281373.95 rows=1347 width=40)
-## 2                    Filter: (creationdate ~~ '2016-05-11%'::text)</code></pre>
+<pre><code>##                                                       QUERY PLAN
+## 1 Seq Scan on questions  (cost=0.00..64039.90 rows=281 width=52)
+## 2                  Filter: (creationdate ~~ '2016-05-11%'::text)</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">system.time</span>(result &lt;-<span class="st"> </span><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;select * from questions</span>
 <span class="st">                   where creationdate like '2016-05-11%'&quot;</span>))  <span class="co"># 2.6 sec. (still a sequential scan)</span></code></pre></div>
 <pre><code>##    user  system elapsed 
-##   0.013   0.000   2.553</code></pre>
+##   0.003   0.000   0.554</code></pre>
 </div>
 <div id="sql-query-plans-and-explain-2" class="slide section level1">
 <h1>SQL query plans and EXPLAIN (2)</h1>
@@ -789,23 +798,23 @@ db &lt;-<span class="st"> </span><span class="kw">dbConnect</span>(drv, <span cl
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;explain select * from questions where</span>
 <span class="st">               creationdate = '2016-05-11 00:00:15'&quot;</span>)</code></pre></div>
 <pre><code>##                                                                    QUERY PLAN
-## 1 Index Scan using date_index on questions  (cost=0.56..8.58 rows=1 width=40)
+## 1 Index Scan using date_index on questions  (cost=0.43..8.45 rows=1 width=52)
 ## 2                    Index Cond: (creationdate = '2016-05-11 00:00:15'::text)</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">system.time</span>(<span class="kw">dbGetQuery</span>(db, <span class="st">&quot;select * from questions where</span>
 <span class="st">                           creationdate = '2016-05-11 00:00:15'&quot;</span>)) <span class="co"># .006 sec.</span></code></pre></div>
 <pre><code>##    user  system elapsed 
-##   0.002   0.001   0.011</code></pre>
+##   0.002   0.000   0.007</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;drop index date_index&quot;</span>)</code></pre></div>
 <pre><code>## NULL</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;explain select * from questions where</span>
 <span class="st">               creationdate = '2016-05-11 00:00:15'&quot;</span>)</code></pre></div>
-<pre><code>##                                                      QUERY PLAN
-## 1 Seq Scan on questions  (cost=0.00..281373.95 rows=1 width=40)
-## 2          Filter: (creationdate = '2016-05-11 00:00:15'::text)</code></pre>
+<pre><code>##                                                     QUERY PLAN
+## 1 Seq Scan on questions  (cost=0.00..64039.90 rows=1 width=52)
+## 2         Filter: (creationdate = '2016-05-11 00:00:15'::text)</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">system.time</span>(<span class="kw">dbGetQuery</span>(db, <span class="st">&quot;select * from questions where</span>
 <span class="st">                           creationdate = '2016-05-11 00:00:15'&quot;</span>)) <span class="co"># 2.2 sec.</span></code></pre></div>
 <pre><code>##    user  system elapsed 
-##   0.002   0.000   2.171</code></pre>
+##   0.003   0.000   0.487</code></pre>
 <p>Here's additional information on interpreting what you see: <a href="https://www.postgresql.org/docs/9.5/static/using-explain.html" class="uri">https://www.postgresql.org/docs/9.5/static/using-explain.html</a>.</p>
 <p>The main thing to look for is to see if the query will be done by using an index or by sequential scan (i.e., looking at all the rows).</p>
 </div>
@@ -826,20 +835,20 @@ db &lt;-<span class="st"> </span><span class="kw">dbConnect</span>(drv, <span cl
 <p>Should an inner join be faster than a cross join with a WHERE that restricts to matches?</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;explain select * from questions Q join</span>
 <span class="st">               questions_tags T on Q.questionid = T.questionid&quot;</span>)</code></pre></div>
-<pre><code>##                                                                           QUERY PLAN
-## 1                     Hash Join  (cost=521358.91..2801364.23 rows=39985376 width=56)
-## 2                                           Hash Cond: (t.questionid = q.questionid)
-## 3    -&gt;  Seq Scan on questions_tags t  (cost=0.00..634684.76 rows=39985376 width=16)
-## 4                       -&gt;  Hash  (cost=247691.96..247691.96 rows=13472796 width=40)
-## 5         -&gt;  Seq Scan on questions q  (cost=0.00..247691.96 rows=13472796 width=40)</code></pre>
+<pre><code>##                                                                         QUERY PLAN
+## 1                     Hash Join  (cost=119538.00..508196.86 rows=8140985 width=72)
+## 2                                         Hash Cond: (t.questionid = q.questionid)
+## 3   -&gt;  Seq Scan on questions_tags t  (cost=0.00..133544.85 rows=8140985 width=20)
+## 4                        -&gt;  Hash  (cost=57022.89..57022.89 rows=2807689 width=52)
+## 5         -&gt;  Seq Scan on questions q  (cost=0.00..57022.89 rows=2807689 width=52)</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;explain select * from questions Q cross join</span>
 <span class="st">               questions_tags T where Q.questionid = T.questionid&quot;</span>)</code></pre></div>
-<pre><code>##                                                                           QUERY PLAN
-## 1                     Hash Join  (cost=521358.91..2801364.23 rows=39985376 width=56)
-## 2                                           Hash Cond: (t.questionid = q.questionid)
-## 3    -&gt;  Seq Scan on questions_tags t  (cost=0.00..634684.76 rows=39985376 width=16)
-## 4                       -&gt;  Hash  (cost=247691.96..247691.96 rows=13472796 width=40)
-## 5         -&gt;  Seq Scan on questions q  (cost=0.00..247691.96 rows=13472796 width=40)</code></pre>
+<pre><code>##                                                                         QUERY PLAN
+## 1                     Hash Join  (cost=119542.18..508202.04 rows=8140985 width=72)
+## 2                                         Hash Cond: (t.questionid = q.questionid)
+## 3   -&gt;  Seq Scan on questions_tags t  (cost=0.00..133544.85 rows=8140985 width=20)
+## 4                        -&gt;  Hash  (cost=57024.86..57024.86 rows=2807786 width=52)
+## 5         -&gt;  Seq Scan on questions q  (cost=0.00..57024.86 rows=2807786 width=52)</code></pre>
 <p>Here's a basic interpretation: the plan is to carry out a hash join (which loads data from one table into a hash table and then checks each record in the other table against that hash table). This involves sequentially scanning through both tables (on questions_tags to create the hash table and on questions to look for matches against the hash table).</p>
 </div>
 <div id="examples-2" class="slide section level1">
@@ -847,27 +856,23 @@ db &lt;-<span class="st"> </span><span class="kw">dbConnect</span>(drv, <span cl
 <p>Should a join that first subsets the first table be faster than a join that subsets the result?</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;explain select * from questions Q join</span>
 <span class="st">               questions_tags T on Q.questionid = T.questionid where tag = 'python'&quot;</span>)</code></pre></div>
-<pre><code>##                                                                                           QUERY PLAN
-## 1                                        Hash Join  (cost=535614.54..910585.22 rows=683750 width=56)
-## 2                                                           Hash Cond: (t.questionid = q.questionid)
-## 3          -&gt;  Bitmap Heap Scan on questions_tags t  (cost=14255.63..257633.50 rows=683750 width=16)
-## 4                                                               Recheck Cond: (tag = 'python'::text)
-## 5         -&gt;  Bitmap Index Scan on questions_tags_tag_idx  (cost=0.00..14084.69 rows=683750 width=0)
-## 6                                                                 Index Cond: (tag = 'python'::text)
-## 7                                       -&gt;  Hash  (cost=247691.96..247691.96 rows=13472796 width=40)
-## 8                         -&gt;  Seq Scan on questions q  (cost=0.00..247691.96 rows=13472796 width=40)</code></pre>
+<pre><code>##                                                                         QUERY PLAN
+## 1                      Hash Join  (cost=119542.18..303707.13 rows=101762 width=72)
+## 2                                         Hash Cond: (t.questionid = q.questionid)
+## 3    -&gt;  Seq Scan on questions_tags t  (cost=0.00..153897.31 rows=101762 width=20)
+## 4                                                   Filter: (tag = 'python'::text)
+## 5                        -&gt;  Hash  (cost=57024.86..57024.86 rows=2807786 width=52)
+## 6         -&gt;  Seq Scan on questions q  (cost=0.00..57024.86 rows=2807786 width=52)</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dbGetQuery</span>(db, <span class="st">&quot;explain select * from questions Q join</span>
 <span class="st">               (select * from questions_tags where tag = 'python') T2</span>
 <span class="st">               on Q.questionid = T2.questionid&quot;</span>)</code></pre></div>
-<pre><code>##                                                                                           QUERY PLAN
-## 1                                        Hash Join  (cost=535614.54..910585.22 rows=683750 width=56)
-## 2                                              Hash Cond: (questions_tags.questionid = q.questionid)
-## 3            -&gt;  Bitmap Heap Scan on questions_tags  (cost=14255.63..257633.50 rows=683750 width=16)
-## 4                                                               Recheck Cond: (tag = 'python'::text)
-## 5         -&gt;  Bitmap Index Scan on questions_tags_tag_idx  (cost=0.00..14084.69 rows=683750 width=0)
-## 6                                                                 Index Cond: (tag = 'python'::text)
-## 7                                       -&gt;  Hash  (cost=247691.96..247691.96 rows=13472796 width=40)
-## 8                         -&gt;  Seq Scan on questions q  (cost=0.00..247691.96 rows=13472796 width=40)</code></pre>
+<pre><code>##                                                                         QUERY PLAN
+## 1                      Hash Join  (cost=119542.18..303707.13 rows=101762 width=72)
+## 2                            Hash Cond: (questions_tags.questionid = q.questionid)
+## 3      -&gt;  Seq Scan on questions_tags  (cost=0.00..153897.31 rows=101762 width=20)
+## 4                                                   Filter: (tag = 'python'::text)
+## 5                        -&gt;  Hash  (cost=57024.86..57024.86 rows=2807786 width=52)
+## 6         -&gt;  Seq Scan on questions q  (cost=0.00..57024.86 rows=2807786 width=52)</code></pre>
 </div>
 </body>
 </html>
