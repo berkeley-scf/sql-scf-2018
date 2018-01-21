@@ -680,6 +680,12 @@ dbGetQuery(db, &quot;select * from questionsAugment where age &gt; 75 limit 5&qu
 ## 5  97  Alan Storm
 </code></pre>
 
+<pre><code class="r">dbGetQuery(db, &quot;drop view questionsAugment&quot;) # drop so our database is clean
+</code></pre>
+
+<pre><code>## data frame with 0 columns and 0 rows
+</code></pre>
+
 <p>One use of a view would be to create a mega table that stores all the information from multiple tables in the (unnormalized) form you might have if you simply had one data frame in R or Python.</p>
 
 <h1>Various kinds of joins</h1>
@@ -883,10 +889,6 @@ dbGetQuery(db, &quot;select count(distinct tag) from questions_tags&quot;)
                tag = &#39;python&#39;&quot;)
 </code></pre>
 
-<ul>
-<li>How many users have asked a question with a Python tag (again - do it with a subquery).</li>
-</ul>
-
 <h1>String operations</h1>
 
 <p>In Postgres, in addition the basic use of LIKE to match character strings, one can regular expression syntax with SIMILAR TO and one can extract substrings with SUBSTRING.</p>
@@ -1070,10 +1072,6 @@ db2 &lt;- dbConnect(drv, dbname = &#39;wikistats&#39;, user = &#39;paciorek&#39;
                      port = 63333, password = &#39;test&#39;, host = &#39;localhost&#39;)
 </code></pre>
 
-<pre><code>## Error in postgresqlNewConnection(drv, ...): RS-DBI driver: (could not connect paciorek@localhost on dbname &quot;wikistats&quot;
-## )
-</code></pre>
-
 <h1>Efficiency of SQL queries</h1>
 
 <p>Some tips for faster queries include:</p>
@@ -1112,18 +1110,21 @@ dbGetQuery(db, &quot;drop index tag_index&quot;)
 <p>You can actually examine the query plan that the system is going to use for a query using the EXPLAIN keyword. We&#39;ll do this in PostgreSQL as the output is more user-friendly.</p>
 
 <pre><code class="r">dbDisconnect(db)
+library(RPostgreSQL)
+drv &lt;- dbDriver(&quot;PostgreSQL&quot;)
 db &lt;- dbConnect(drv, dbname = &#39;stackoverflow&#39;, user = &#39;paciorek&#39;,
                      port = 63333, password = &#39;test&#39;, host = &#39;localhost&#39;)
 </code></pre>
 
 <p>Here we see that even after putting an index, this string-based query is still done as a sequential scan through all of the rows. </p>
 
-<pre><code class="r">dbGetQuery(db, &quot;explain select * from questions where creationdate like &#39;2016-05-11%&#39;&quot;)
+<pre><code class="r">dbGetQuery(db, &quot;explain select * from questions where creationdate
+               like &#39;2016-05-11%&#39;&quot;)
 </code></pre>
 
-<pre><code>##                                                       QUERY PLAN
-## 1 Seq Scan on questions  (cost=0.00..64646.11 rows=283 width=52)
-## 2                  Filter: (creationdate ~~ &#39;2016-05-11%&#39;::text)
+<pre><code>##                                                         QUERY PLAN
+## 1 Seq Scan on questions  (cost=0.00..281373.95 rows=1347 width=40)
+## 2                    Filter: (creationdate ~~ &#39;2016-05-11%&#39;::text)
 </code></pre>
 
 <pre><code class="r">system.time(result &lt;- dbGetQuery(db, &quot;select * from questions
@@ -1131,7 +1132,7 @@ db &lt;- dbConnect(drv, dbname = &#39;stackoverflow&#39;, user = &#39;paciorek&#
 </code></pre>
 
 <pre><code>##    user  system elapsed 
-##   0.002   0.000   0.570
+##   0.013   0.000   2.487
 </code></pre>
 
 <pre><code class="r">dbGetQuery(db, &quot;create index date_index on questions(creationdate)&quot;) # takes a long time
@@ -1140,12 +1141,13 @@ db &lt;- dbConnect(drv, dbname = &#39;stackoverflow&#39;, user = &#39;paciorek&#
 <pre><code>## NULL
 </code></pre>
 
-<pre><code class="r">dbGetQuery(db, &quot;explain select * from questions where creationdate like &#39;2016-05-11%&#39;&quot;)
+<pre><code class="r">dbGetQuery(db, &quot;explain select * from questions where creationdate
+               like &#39;2016-05-11%&#39;&quot;)
 </code></pre>
 
-<pre><code>##                                                       QUERY PLAN
-## 1 Seq Scan on questions  (cost=0.00..64655.38 rows=283 width=52)
-## 2                  Filter: (creationdate ~~ &#39;2016-05-11%&#39;::text)
+<pre><code>##                                                         QUERY PLAN
+## 1 Seq Scan on questions  (cost=0.00..281373.95 rows=1347 width=40)
+## 2                    Filter: (creationdate ~~ &#39;2016-05-11%&#39;::text)
 </code></pre>
 
 <pre><code class="r">system.time(result &lt;- dbGetQuery(db, &quot;select * from questions
@@ -1153,7 +1155,7 @@ db &lt;- dbConnect(drv, dbname = &#39;stackoverflow&#39;, user = &#39;paciorek&#
 </code></pre>
 
 <pre><code>##    user  system elapsed 
-##   0.003   0.000   0.566
+##   0.013   0.000   2.474
 </code></pre>
 
 <h1>SQL query plans and EXPLAIN (2)</h1>
@@ -1165,7 +1167,7 @@ db &lt;- dbConnect(drv, dbname = &#39;stackoverflow&#39;, user = &#39;paciorek&#
 </code></pre>
 
 <pre><code>##                                                                    QUERY PLAN
-## 1 Index Scan using date_index on questions  (cost=0.43..8.45 rows=1 width=52)
+## 1 Index Scan using date_index on questions  (cost=0.56..8.58 rows=1 width=40)
 ## 2                    Index Cond: (creationdate = &#39;2016-05-11 00:00:15&#39;::text)
 </code></pre>
 
@@ -1174,7 +1176,7 @@ db &lt;- dbConnect(drv, dbname = &#39;stackoverflow&#39;, user = &#39;paciorek&#
 </code></pre>
 
 <pre><code>##    user  system elapsed 
-##   0.002   0.000   0.006
+##   0.001   0.003   0.009
 </code></pre>
 
 <pre><code class="r">dbGetQuery(db, &quot;drop index date_index&quot;)
@@ -1187,9 +1189,9 @@ db &lt;- dbConnect(drv, dbname = &#39;stackoverflow&#39;, user = &#39;paciorek&#
                creationdate = &#39;2016-05-11 00:00:15&#39;&quot;)
 </code></pre>
 
-<pre><code>##                                                     QUERY PLAN
-## 1 Seq Scan on questions  (cost=0.00..64655.38 rows=1 width=52)
-## 2         Filter: (creationdate = &#39;2016-05-11 00:00:15&#39;::text)
+<pre><code>##                                                      QUERY PLAN
+## 1 Seq Scan on questions  (cost=0.00..281373.95 rows=1 width=40)
+## 2          Filter: (creationdate = &#39;2016-05-11 00:00:15&#39;::text)
 </code></pre>
 
 <pre><code class="r">system.time(dbGetQuery(db, &quot;select * from questions where
@@ -1197,7 +1199,7 @@ db &lt;- dbConnect(drv, dbname = &#39;stackoverflow&#39;, user = &#39;paciorek&#
 </code></pre>
 
 <pre><code>##    user  system elapsed 
-##   0.003   0.000   0.447
+##   0.002   0.001   2.082
 </code></pre>
 
 <p>Here&#39;s additional information on interpreting what you see: <a href="https://www.postgresql.org/docs/9.5/static/using-explain.html">https://www.postgresql.org/docs/9.5/static/using-explain.html</a>.</p>
@@ -1224,24 +1226,24 @@ db &lt;- dbConnect(drv, dbname = &#39;stackoverflow&#39;, user = &#39;paciorek&#
                questions_tags T on Q.questionid = T.questionid&quot;)
 </code></pre>
 
-<pre><code>##                                                                         QUERY PLAN
-## 1                     Hash Join  (cost=120683.27..513137.60 rows=8220622 width=72)
-## 2                                         Hash Cond: (t.questionid = q.questionid)
-## 3   -&gt;  Seq Scan on questions_tags t  (cost=0.00..134851.22 rows=8220622 width=20)
-## 4                        -&gt;  Hash  (cost=57568.90..57568.90 rows=2834590 width=52)
-## 5         -&gt;  Seq Scan on questions q  (cost=0.00..57568.90 rows=2834590 width=52)
+<pre><code>##                                                                           QUERY PLAN
+## 1                     Hash Join  (cost=521358.91..2801364.23 rows=39985376 width=56)
+## 2                                           Hash Cond: (t.questionid = q.questionid)
+## 3    -&gt;  Seq Scan on questions_tags t  (cost=0.00..634684.76 rows=39985376 width=16)
+## 4                       -&gt;  Hash  (cost=247691.96..247691.96 rows=13472796 width=40)
+## 5         -&gt;  Seq Scan on questions q  (cost=0.00..247691.96 rows=13472796 width=40)
 </code></pre>
 
 <pre><code class="r">dbGetQuery(db, &quot;explain select * from questions Q cross join
                questions_tags T where Q.questionid = T.questionid&quot;)
 </code></pre>
 
-<pre><code>##                                                                         QUERY PLAN
-## 1                     Hash Join  (cost=120683.27..513137.60 rows=8220622 width=72)
-## 2                                         Hash Cond: (t.questionid = q.questionid)
-## 3   -&gt;  Seq Scan on questions_tags t  (cost=0.00..134851.22 rows=8220622 width=20)
-## 4                        -&gt;  Hash  (cost=57568.90..57568.90 rows=2834590 width=52)
-## 5         -&gt;  Seq Scan on questions q  (cost=0.00..57568.90 rows=2834590 width=52)
+<pre><code>##                                                                           QUERY PLAN
+## 1                     Hash Join  (cost=521358.91..2801364.23 rows=39985376 width=56)
+## 2                                           Hash Cond: (t.questionid = q.questionid)
+## 3    -&gt;  Seq Scan on questions_tags t  (cost=0.00..634684.76 rows=39985376 width=16)
+## 4                       -&gt;  Hash  (cost=247691.96..247691.96 rows=13472796 width=40)
+## 5         -&gt;  Seq Scan on questions q  (cost=0.00..247691.96 rows=13472796 width=40)
 </code></pre>
 
 <p>Here&#39;s a basic interpretation: the plan is to carry out a hash join (which loads data from one table into a hash table and then checks each record in the other table against that hash table). This involves sequentially scanning through both tables (on questions_tags to create the hash table and on questions to look for matches against the hash table).</p>
@@ -1254,13 +1256,15 @@ db &lt;- dbConnect(drv, dbname = &#39;stackoverflow&#39;, user = &#39;paciorek&#
                questions_tags T on Q.questionid = T.questionid where tag = &#39;python&#39;&quot;)
 </code></pre>
 
-<pre><code>##                                                                         QUERY PLAN
-## 1                      Hash Join  (cost=120683.27..306643.87 rows=102758 width=72)
-## 2                                         Hash Cond: (t.questionid = q.questionid)
-## 3    -&gt;  Seq Scan on questions_tags t  (cost=0.00..155402.78 rows=102758 width=20)
-## 4                                                   Filter: (tag = &#39;python&#39;::text)
-## 5                        -&gt;  Hash  (cost=57568.90..57568.90 rows=2834590 width=52)
-## 6         -&gt;  Seq Scan on questions q  (cost=0.00..57568.90 rows=2834590 width=52)
+<pre><code>##                                                                                           QUERY PLAN
+## 1                                        Hash Join  (cost=536837.04..914798.83 rows=742395 width=56)
+## 2                                                           Hash Cond: (t.questionid = q.questionid)
+## 3          -&gt;  Bitmap Heap Scan on questions_tags t  (cost=15478.13..259589.06 rows=742395 width=16)
+## 4                                                               Recheck Cond: (tag = &#39;python&#39;::text)
+## 5         -&gt;  Bitmap Index Scan on questions_tags_tag_idx  (cost=0.00..15292.53 rows=742395 width=0)
+## 6                                                                 Index Cond: (tag = &#39;python&#39;::text)
+## 7                                       -&gt;  Hash  (cost=247691.96..247691.96 rows=13472796 width=40)
+## 8                         -&gt;  Seq Scan on questions q  (cost=0.00..247691.96 rows=13472796 width=40)
 </code></pre>
 
 <pre><code class="r">dbGetQuery(db, &quot;explain select * from questions Q join
@@ -1268,13 +1272,15 @@ db &lt;- dbConnect(drv, dbname = &#39;stackoverflow&#39;, user = &#39;paciorek&#
                on Q.questionid = T2.questionid&quot;)
 </code></pre>
 
-<pre><code>##                                                                         QUERY PLAN
-## 1                      Hash Join  (cost=120683.27..306643.87 rows=102758 width=72)
-## 2                            Hash Cond: (questions_tags.questionid = q.questionid)
-## 3      -&gt;  Seq Scan on questions_tags  (cost=0.00..155402.78 rows=102758 width=20)
-## 4                                                   Filter: (tag = &#39;python&#39;::text)
-## 5                        -&gt;  Hash  (cost=57568.90..57568.90 rows=2834590 width=52)
-## 6         -&gt;  Seq Scan on questions q  (cost=0.00..57568.90 rows=2834590 width=52)
+<pre><code>##                                                                                           QUERY PLAN
+## 1                                        Hash Join  (cost=536837.04..914798.83 rows=742395 width=56)
+## 2                                              Hash Cond: (questions_tags.questionid = q.questionid)
+## 3            -&gt;  Bitmap Heap Scan on questions_tags  (cost=15478.13..259589.06 rows=742395 width=16)
+## 4                                                               Recheck Cond: (tag = &#39;python&#39;::text)
+## 5         -&gt;  Bitmap Index Scan on questions_tags_tag_idx  (cost=0.00..15292.53 rows=742395 width=0)
+## 6                                                                 Index Cond: (tag = &#39;python&#39;::text)
+## 7                                       -&gt;  Hash  (cost=247691.96..247691.96 rows=13472796 width=40)
+## 8                         -&gt;  Seq Scan on questions q  (cost=0.00..247691.96 rows=13472796 width=40)
 </code></pre>
 
 </body>

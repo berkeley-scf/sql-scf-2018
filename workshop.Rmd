@@ -275,7 +275,7 @@ dbGetQuery(db, "create view questionsAugment as select
 dbGetQuery(db, "select * from questionsAugment where age > 75 limit 5")
 ```
 
-```{r, drop-view, include=FALSE}
+```{r, drop-view}
 dbGetQuery(db, "drop view questionsAugment") # drop so our database is clean
 ```
               
@@ -458,8 +458,6 @@ dbGetQuery(db, "select avg(upvotes) from questions Q , questions_tags T, users U
                Q.ownerid = U.userid and
                tag = 'python'")
 ```
-
-- How many users have asked a question with a Python tag (again - do it with a subquery).
 
 
 # String operations
@@ -654,7 +652,7 @@ docker run -p 63333:5432 -ti rocker/r-base /bin/bash
 Now in R or Python, connect to the database using RPostgreSQL or psycopg2 with host='localhost' and port=63333. For example,
 
 
-```{r, postgres-load, eval=TRUE}
+```{r, postgres-load, eval=FALSE}
 library(RPostgreSQL)
 drv <- dbDriver("PostgreSQL")
 db2 <- dbConnect(drv, dbname = 'wikistats', user = 'paciorek',
@@ -698,6 +696,8 @@ You can actually examine the query plan that the system is going to use for a qu
 
 ```{r, sqlite-disconnect}
 dbDisconnect(db)
+library(RPostgreSQL)
+drv <- dbDriver("PostgreSQL")
 db <- dbConnect(drv, dbname = 'stackoverflow', user = 'paciorek',
                      port = 63333, password = 'test', host = 'localhost')
 ```
@@ -706,11 +706,13 @@ Here we see that even after putting an index, this string-based query is still d
 
 
 ```{r, explain}
-dbGetQuery(db, "explain select * from questions where creationdate like '2016-05-11%'")
+dbGetQuery(db, "explain select * from questions where creationdate
+               like '2016-05-11%'")
 system.time(result <- dbGetQuery(db, "select * from questions
                    where creationdate like '2016-05-11%'"))  # 2.6 sec.
 dbGetQuery(db, "create index date_index on questions(creationdate)") # takes a long time
-dbGetQuery(db, "explain select * from questions where creationdate like '2016-05-11%'")
+dbGetQuery(db, "explain select * from questions where creationdate
+               like '2016-05-11%'")
 system.time(result <- dbGetQuery(db, "select * from questions
                    where creationdate like '2016-05-11%'"))  # 2.6 sec. (still a sequential scan)
 ```
